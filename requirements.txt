@@ -1,4 +1,5 @@
-pandapower
-numpy
-pandas
+matplotlib==3.5.1
 numba
+numpy
+pandapower
+pandas
