@@ -4,6 +4,7 @@ import numpy as np
 import pandapower.networks as networks
 import matplotlib.pyplot as plt
 
+
 # https://pandapower.readthedocs.io/en/v2.9.0/networks/example.html
 
 def compute_reactive_power(p_mw, cos_phi=0.97, operating_mode='inductive'):
@@ -108,23 +109,33 @@ def run_simulation(net):
     sgen_values = []
     sgen_2_values = []
     sgen_index = 2
+    idx_counter = 0
+    original_power_values = [170, 170, 170, 170, 130, 130, 90, 80, 80]
 
     for time, power_value in zip(dates, power):
+        print('Aktueller Zeitschritt: ', time)
+        if original_power_values[
+            idx_counter] - power_value >= 100 or power_value < 0:
+            raise ValueError('Dieser Wert ist für die Anlage nicht erlaubt!')
+
         net['sgen'].loc[sgen_index,
                         'p_mw'] = power_value
         q = compute_reactive_power(power_value)
         net['sgen'].loc[sgen_index,
                         'q_mvar'] = q
         try:
-            pp.runpp(net, numba=True)
+            pp.runpp(net, numba=False)
         except:
-            pass
+            print('Die Lastflussrechnung ist nicht konvergiert!')
         res_vmpu = net['res_bus']['vm_pu'].tolist()
         for idx in range(len(res_vmpu)):
             if np.isnan(res_vmpu[idx]):
                 res_vmpu[idx] = 0
             # res_vmpu[idx] = abs(res_[idx])
-        bus_values.append(np.mean(res_vmpu))
+        if len(res_vmpu) == 0:
+            bus_values.append(0)
+        else:
+            bus_values.append(np.mean(res_vmpu))
 
         res_load = net['res_load']['p_mw'].tolist()
         for idx in range(len(res_load)):
@@ -144,45 +155,58 @@ def run_simulation(net):
         if np.isnan(res_sgen_2):
             res_sgen_2 = 0
         sgen_2_values.append(res_sgen_2)
-    return dates, bus_values, load_values, sgen_2_values, sgen_2_values
+        idx_counter += 1
+        print('\n')
 
-plt.plot(dates, bus_values)
-plt.xlabel('Zeit')
-plt.ylabel('Spannungswerte')
-plt.title('Spannung der Busse')
-# function to show the plot
-plt.show()
+    date_idx = [idx for idx in range(len(dates))]
+    return date_idx, sgen_values, bus_values, load_values, sgen_2_values, power
 
 
-plt.plot(dates, load_values)
-plt.xlabel('Zeit')
-plt.ylabel('Leistung')
-plt.title('Leistungswerte der Lasten')
+def plot_bus_values(dates, bus_values):
+    plt.plot(dates, bus_values)
+    plt.xlabel('Zeit')
+    plt.ylabel('Spannungswerte')
+    plt.title('Spannung der Busse')
+    # function to show the plot
+    plt.show()
 
-# function to show the plot
-plt.show()
 
-plt.plot(dates, sgen_values)
-plt.xlabel('Zeit')
-plt.ylabel('Leistung')
-plt.title('Leistungswerte der Generatoren')
+def plot_load_values(dates, load_values):
+    plt.plot(dates, load_values)
+    plt.xlabel('Zeit')
+    plt.ylabel('Leistung')
+    plt.title('Leistungswerte der Lasten')
 
-# function to show the plot
-plt.show()
+    # function to show the plot
+    plt.show()
 
-plt.plot(dates, sgen_2_values)
-plt.xlabel('Zeit')
-plt.ylabel('Leistung')
-plt.title('Leistungswerte Generator 2')
 
-# function to show the plot
-plt.show()
+def plot_generator_values(dates, sgen_values):
+    plt.plot(dates, sgen_values)
+    plt.xlabel('Zeit')
+    plt.ylabel('Leistung')
+    plt.title('Leistungswerte der Generatoren')
 
-# Fahrplanwerte
-plt.plot(dates, sgen_2_values)
-plt.xlabel('Zeit')
-plt.ylabel('Leistung')
-plt.title('Fahrplanwerte Generator 2')
+    # function to show the plot
+    plt.show()
 
-# function to show the plot
-plt.show()
+
+def plot_sgen2_values(dates, sgen_2_values):
+    plt.plot(dates, sgen_2_values)
+    plt.xlabel('Zeit')
+    plt.ylabel('Leistung')
+    plt.title('Leistungswerte Generator 2')
+
+    # function to show the plot
+    plt.show()
+
+
+def plot_schedule_values(dates, schedule_values):
+    # Fahrplanwerte
+    plt.plot(dates, schedule_values)
+    plt.xlabel('Zeit')
+    plt.ylabel('Leistung')
+    plt.title('Fahrplanwerte Generator 2')
+
+    # function to show the plot
+    plt.show()
