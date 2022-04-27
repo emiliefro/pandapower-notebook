@@ -5,8 +5,6 @@ import pandapower.networks as networks
 import matplotlib.pyplot as plt
 
 # https://pandapower.readthedocs.io/en/v2.9.0/networks/example.html
-networks.simple_mv_open_ring_net()
-
 
 def compute_reactive_power(p_mw, cos_phi=0.97, operating_mode='inductive'):
     """Calculates reactive power according to given active power,
@@ -25,7 +23,7 @@ def compute_reactive_power(p_mw, cos_phi=0.97, operating_mode='inductive'):
         return - abs_q
 
 
-def create_net():
+def create_net(switch_open=False):
     net = pp.create_empty_network()
 
     bus_hv = pp.create_bus(net, name="110 kV bar", vn_kv=110, type='b',
@@ -77,8 +75,6 @@ def create_net():
     pp.create_sgen(net, bus_3, p_mw=1, q_mvar=compute_reactive_power(1),
                    name="sgen 1")
 
-    # dazwischen switch
-
     load_2 = pp.create_load(net, bus_4, p_mw=1,
                             q_mvar=compute_reactive_power(1), name="load 2")
     pp.create_sgen(net, bus_4, p_mw=160, q_mvar=compute_reactive_power(160),
@@ -94,61 +90,61 @@ def create_net():
     pp.create_sgen(net, bus_6, p_mw=100, q_mvar=compute_reactive_power(100),
                    name="sgen 4")
 
-    pp.create_switch(net, bus_3, line_2, et='l', closed=True,
+    pp.create_switch(net, bus_3, line_2, et='l', closed=switch_open,
                      type='LBS')
-    # pp.create_switch(net, bus_4, line_2, et='l', closed=False,
-    #                  type='LBS')
+
     return net
 
 
 # scenario
-net = create_net()
-csv = pd.read_csv('pv.csv', delimiter=';',
-                  encoding="utf-8-sig")
-dates = csv["Datum"].tolist()
-power = csv["MW"].tolist()
+def run_simulation(net):
+    csv = pd.read_csv('pv.csv', delimiter=';',
+                      encoding="utf-8-sig")
+    dates = csv["Datum"].tolist()
+    power = csv["MW"].tolist()
 
-bus_values = []
-load_values = []
-sgen_values = []
-sgen_2_values = []
-sgen_index = 2
+    bus_values = []
+    load_values = []
+    sgen_values = []
+    sgen_2_values = []
+    sgen_index = 2
 
-for time, power_value in zip(dates, power):
-    net['sgen'].loc[sgen_index,
-                    'p_mw'] = power_value
-    q = compute_reactive_power(power_value)
-    net['sgen'].loc[sgen_index,
-                    'q_mvar'] = q
-    try:
-        pp.runpp(net, numba=True)
-    except:
-        pass
-    res_vmpu = net['res_bus']['vm_pu'].tolist()
-    for idx in range(len(res_vmpu)):
-        if np.isnan(res_vmpu[idx]):
-            res_vmpu[idx] = 0
-        # res_vmpu[idx] = abs(res_[idx])
-    bus_values.append(np.mean(res_vmpu))
+    for time, power_value in zip(dates, power):
+        net['sgen'].loc[sgen_index,
+                        'p_mw'] = power_value
+        q = compute_reactive_power(power_value)
+        net['sgen'].loc[sgen_index,
+                        'q_mvar'] = q
+        try:
+            pp.runpp(net, numba=True)
+        except:
+            pass
+        res_vmpu = net['res_bus']['vm_pu'].tolist()
+        for idx in range(len(res_vmpu)):
+            if np.isnan(res_vmpu[idx]):
+                res_vmpu[idx] = 0
+            # res_vmpu[idx] = abs(res_[idx])
+        bus_values.append(np.mean(res_vmpu))
 
-    res_load = net['res_load']['p_mw'].tolist()
-    for idx in range(len(res_load)):
-        if np.isnan(res_load[idx]):
-            res_load[idx] = 0
-        # res_vmpu[idx] = abs(res_[idx])
-    load_values.append(np.mean(res_load))
+        res_load = net['res_load']['p_mw'].tolist()
+        for idx in range(len(res_load)):
+            if np.isnan(res_load[idx]):
+                res_load[idx] = 0
+            # res_vmpu[idx] = abs(res_[idx])
+        load_values.append(np.mean(res_load))
 
-    res_sgen = net['res_sgen']['p_mw'].tolist()
-    for idx in range(len(res_sgen)):
-        if np.isnan(res_sgen[idx]):
-            res_sgen[idx] = 0
-        # res_sgen[idx] = abs(res_[idx])
-    sgen_values.append(np.mean(res_sgen))
+        res_sgen = net['res_sgen']['p_mw'].tolist()
+        for idx in range(len(res_sgen)):
+            if np.isnan(res_sgen[idx]):
+                res_sgen[idx] = 0
+            # res_sgen[idx] = abs(res_[idx])
+        sgen_values.append(np.mean(res_sgen))
 
-    res_sgen_2 = net['res_sgen']['p_mw'][sgen_index].tolist()
-    if np.isnan(res_sgen_2):
-        res_sgen_2 = 0
-    sgen_2_values.append(res_sgen_2)
+        res_sgen_2 = net['res_sgen']['p_mw'][sgen_index].tolist()
+        if np.isnan(res_sgen_2):
+            res_sgen_2 = 0
+        sgen_2_values.append(res_sgen_2)
+    return dates, bus_values, load_values, sgen_2_values, sgen_2_values
 
 plt.plot(dates, bus_values)
 plt.xlabel('Zeit')
